@@ -1,0 +1,328 @@
+---
+# Report details
+report-series: "University of Adelaide Biometry Hub\\ Technical Report Series"
+report-number: "SS001"
+title: Examining different strategies of sampling data to train a neural \ network model for seedling emergence detection in aerial farm images
+subtitle: "-- *Report for the Data Science research project (part A)* --"
+author: "Tuan Minh Nguyen"
+job-title: 
+address: 
+email: "a1847275@adelaide.edu.au"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+
+# List logos here as the filename without extension
+logos:
+  - assets/UoA
+  - assets/bhub
+
+#Latex options
+documentclass: article  # Alternatively book for chapters that start new pages
+classoption:
+  - oneside
+  - 12pt
+header-includes:
+  - \usepackage{subcaption}
+  - \usepackage{bbm}
+  - \usepackage{caption}
+  - \captionsetup{font={sf}, labelfont={bf}}
+bibliography: supplementary/all-references.bib
+csl: assets/biometrics_work.csl
+knit: yes
+number-sections: yes
+toc: yes
+link-citations: true
+output:
+  bookdown::pdf_document2:
+    keep_tex: yes
+    latex_engine: pdflatex
+    template: assets/SAGI_markdown.tex
+---
+
+```{r knitr_options, include=FALSE}
+library(rmarkdown)
+library(xtable)
+options(formatR.arrow=FALSE, xtable.comment=FALSE)
+knitr::opts_chunk$set(fig.path='figure/Rplots-',
+                      fig.align='center',
+                      fig.show='hold',
+                      comment=NA,
+                      background='white',
+                      highlight=FALSE,
+                      tidy=TRUE,
+                      tidy.opts=list(width.cutoff=60),
+                      size= "small",
+                      prompt=TRUE)
+```
+
+## Abstract {-}
+
+To support the detection of early emergence of plants in the field of agronomy, sophisticated technologies such as neural network models have been recently developed to make use of aerial photographs captured on crop fields. This source of image data is normally overlooked and forgotten but it can bring huge benefits to many agricultural applications. However, those intricate models often struggle with elongated training time due to large image resolutions, which prompts agricultural technicians and machine learning practitioners to sample only a subset of the available data to train the models. In this work, different sampling methods with a pre-determined sample size are experimented on the training data that is fed into a neural network model for recognising and counting plant emergence of faba beans in crop images, with the aim of highlighting the differences in the resulting model performances. The results demonstrate that changing the ways of selecting data to train the model would cause it to return different levels of performance scores in most pairwise comparisons, and those differences can be graphically visualised and statistically assessed. Optimally, the model will reach a notably better performance when the positive class occupies around 70%-80% of slots in the training-data sample, compared with the other sampling protocols.
+
+\mainmatter
+\pagestyle{fancy}
+
+<!-- article class-->
+
+# Introduction
+
+Attracting strong attention from plant breeders and growers, seedling emergence is among the most crucial but vulnerable stages deciding the success of crop development [@Lamichhane_Messean_Ricci_2019]. Short delays in the determination of the emergence time might result in substantial impacts on the future fitness of plants [@Verdu_Traveset_2005]. However, manually conducting in-field investigations to detect seedling emergence requires strenuous effort and is exceedingly time-consuming. Also, counting emerged plants takes so much time that the window of observations will not allow side-by-side comparisons. Therefore, many cutting-edge technologies have been developed to assist agriculturists in identifying early emergence of plants, especially the instruments that employ computational image processing on aerial photographs. With the increased use of unmanned aerial vehicles (UAVs), widely known as drones, to take photos of crop fields, it has been realised that a huge amount of data from those photos could be exploited to build automated models for seedling emergence identification, otherwise such valuable data would become un-utilised and be consigned to oblivion. In particular, with recent improvements in imagery resolutions, pixel-based classifiers can be implemented to detect pixels containing plants and count visible seedling emergence in farm images, then comparisons can be made with the ground-truthed counts [@van_der_Merwe_et_al_2020].
+
+One of the primary concerns with such classification algorithms for plant-emergence detection is that their training process often requires resource-intensive computing facilities or takes a considerable amount of computational time due to large image sizes and resolutions. When tackling that challenge of computational expense, computer scientists tend to upgrade the model itself to reduce data dimensionality feature-wise by effectively discovering informative variables and discarding redundant predictors [@Magar_Farimani_2023]. Another solution, which involves instance-wise dimensionality reduction and receives less attention from practitioners, is to adjust the selection of data points used for training the model. To be more precise, instead of using the entire training data available, a subset of it could be taken to accelerate the model training. To reduce the training-data size without sacrificing much of the model reliability, the technique of probability sampling could be applied with a careful scrutiny of the sampling strategies to be performed. In this paper, multiple experiments with different sampling protocols, under a fixed pre-determined sample size, will be conducted on the training data of a plant-emergence-detection neural network model, and differences in the resulting model performances will be examined.
+
+The paper is structured as follow: Section 2 provides a summary of previous research that might be related to the topic of interest; Section 3 follows with some technical description of how the simulations are designed as well as the data and the toolsets to be utilised for the experiments; Section 4 will display and compare the experimental results of model performances for different sampling strategies; Section 5 will give a general discussion of the results and some potential limitations; and Section 6 will conclude the project.
+
+# Related works
+
+In the past, data selection by sampling was often studied in relation to training machine learning models when either under-sampling or over-sampling was considered to handle the problem of imbalanced datasets in classification tasks [@Dubey_et_al_2014]. For example, two of the most straightforward techniques are to augment the training data with randomly selected samples from the minority class or to randomly select instances from the majority class [@Lee_Seo_2022]. Over-sampling and under-sampling have an ultimate goal of equalising class distribution, but it is not always guaranteed that an equal occurrence frequency of each class in the training data would result in improved model performance [@Joloudari_et_al_2023]. Other than that, to reduce the likelihood of model overfitting, a novel sampling method was invented by [@Mo_Di_Shi_2023] to optimise the data selection for the training split and validation split, by letting them select instances minimising and maximising prediction errors respectively (both the training and validation splits constitute the entire training data, the former is to directly train a model while the latter is to keep track of its generalisability during the training process). This approach of data sampling concerns how to robustly allocate observations in the training data to the training and validation splits, but it still uses the entire training data as the model input, which is divergent from this paper’s objective of subsetting the training data to train predictive models.
+
+From a narrower perspective, the topic of data sampling for model training has just been truly addressed in a few recent researchers’ works. For instance, [@Magar_Farimani_2023] formulated two algorithms that iteratively add training-data instances, selected by random sampling, to a crystal-graph-convolutional-neural-network model until it returns a desired performance score, the first algorithm selects data points based on the errors the model made on the test dataset, and the second algorithm concerns borderline observations that are difficult to predict. Besides, also conceding that this research area had yet to be addressed in previous studies, [@Quan_et_al_2023] examined several sampling techniques for the selection of observations in a structure tabular dataset to train a random forest model, a popular statistical machine learning method, with a view to classifying burned and unburned land areas for assessing wildfire hazards. This classification between burned and unburned areas appears to be analogous with the topic of interest in this paper, which is about classifying plant and not-plant instances for detecting seedling emergence.
+
+Neither of the two studies above was targeted to the field of agronomy or plant-growing applications, which means that the results they produced might not hold true or be fully applicable to the deep learning models for counting plant emergence and other agricultural activities in general. In the first example, comparisons on statistical sampling strategies were not the main focus of the researchers as the data points selected in each iteration to feed into the model was solely derived from random sampling, despite the attention paid on borderline cases in the second algorithm. Meanwhile, the second example is more closely related to this paper, although the dataset utilised by the researchers was in a structured format, which is different from photographs for image processing, and the model fitted was a traditional machine learning method rather than a neural network architecture. From those studies, an initial foundation was formed for this paper to expectantly make some contributions towards this emerging area in the machine learning industry, in addition to relevant agricultural aspects of plant growing and seedling emergence. To emphasise, this paper is not aimed at exhaustively finding a sampling method that would return the best possible model performance or return the same model performance score as when all the training data is used. Rather, the goal is confined to examining the differences in model performances originated from different ways of sampling the training data.
+
+# Materials and methods
+
+## The data supplied
+
+The data used to produce the outcomes in this paper is a collection of plot images for the early emergence of faba beans from a complete two-year experiment funded by the Grains Research and Development Corporation in Australia. The crop field is located in Strathalbyn, South Australia and the aerial photographs of its plots were taken in 2022 by the Matrice 300 drone equipped with a Real Time Kinetic (RTK) photogrammetry surveying package and a Zenmuse P1 Camera with a 50mm lens. The entire field is divided into 99 rows and 12 columns to make up a total of 1188 plots, each of which corresponds to an image with a rough dimension of 6000-pixel height and 2000-pixel width. Each individual plot was photographed on three different days, resulting in certain differences in the plant sizes and the visibility of plant emergence, so the classification model built to detect and count emerged plants is expected to be trained separately for each of the three days. Within the scope of this project, only the plot images in the third day will be used because they exhibit abundant visible plants that started to emerge, which makes the plant identification and the sampling results less influenced by human errors or by subjective visual perception of seedling emergence.
+
+```{=tex}
+\begin{figure}[h!]
+\centering
+\includegraphics[width = 14.5cm]{supplementary/visualisations/training_data_sampling.png}
+\caption{The entire training data is assumed to consist 9888 annotation cut-outs extracted from 29 plot images, and sampling methods are experimented on those annotations}
+\label{fig:training_data_sampling}
+\end{figure}
+```
+
+Being a supervised learning method, a classification model to identify plant emergence from plot images would require both examples of plant and not-plant instances to distinguish between these two classes. If a plot image is used to train the classification model, it will undergo a preprocessing step in which annotations of plant instances have to be manually marked, but manually scanning through numerous photos with such a large dimension to mark the positions of plants is not necessary. Hence, out of those 1188 plot images, only 29 of them were selected to compose the entire training data, and from those 29 images, a total of 9888 annotations were generated, including 3296 plant instances (positive class) and 6592 not-plant instances (negative class). These annotations are 64x64 cut-outs from the images, and how they are generated will be clarified in the next section. To avoid confusion, the sampling strategies experimented in this project do not concern the selection of plots, but rather it involves the selection of annotations within plots. In other words, the annotations are assumed to be representative of all plots, and the 29 images selected are meant to simulate the only available training data to alleviate unnecessary manual work. Sampling will be carried out on the annotation cut-outs to examine whether different ways of selecting a subset of these annotations to train the model will cause any difference in its performance, as shown in \autoref{fig:training_data_sampling}. Other than those 29 plots, another 30 plots were also selected for the testing data, they resemble data that the model will not encounter at training time, and are supposed to help in the performance evaluation of the model after being trained on the sampled annotations.
+
+## The toolsets provided
+
+Before designing the experimental procedures, the tools utilised throughout this project are briefly described. Developed by the software engineers in the Biometry Hub, those tools are a set of functional easy-to-understand Python programs that can be imported and used within other Python scripts to facilitate the implementation and comparison of sampling experiments. Three of the most frequently used tools to produce the outcomes of this project are illustrated below.
+
+- **peascription.py**: This program allows users to generate two directories of annotation cut-outs from a number of plot images, one folder containing plant instances and the other containing not-plant instances. It was *peascription.py* that produced the 9888 annotation cut-outs from the 29 training plot photos selected. To explain, after manually marking a red dot on each plant instance in a plot image, a user can feed that red-dotted image into *peascription.py* in conjunction with its original image, then the program will draw a 64x64 square around each red-dot position to extract the cut-outs of plant instances, and randomly pick some other 64x64 patches that do not intersect any red-dot squares to extract the cut-outs of not-plant instances. With this program, the manual count of plants in a plot is the same as the number of image files in the plant-annotation directory. 
+
+- **peatrain_tensorflow.py**: The two directories of plant and not-plant annotation cut-outs generated by *peascription.py* can then be put into this program to train a neural network model, whose architecture was already set up in the code. At the end of the training process, a model file will be saved and the validation scores of loss and accuracy, will also be recorded.
+
+- **peapredict_tensorflow.py**: Taking a trained model that was saved before, this program will return the probabilities of a 64x64 image being positive and being negative. The output contains the predicted plant and not-plant probabilities for a square cut-out of size 64x64, but the actual class predicted for that tiny image can be inferred from the comparison of those two probabilities. Due to the classification nature of the deep learning model, *peapredict_tensorflow.py* does not directly take a whole plot image and return a count of plants in it, but the program can be combined with *peascription.py* to produce a model-made plant count for a plot image and subsequently compare that with the manual count for assessing prediction errors.
+
+## The neural network model constructed
+
+To give further technical details, the deep learning model set up in *peatrain_tensorflow.py* is a 10-layer neural network architecture with three 2D convolutional layers containing 32, 64, and 128 filters respectively, a kernel size of 5x5, the number of epochs being 50, a learning rate of 0.001 and a batch size of 64. In the training process, 20% of the training data input is used for the validation split to monitor how well the model generalises to new data. Normally, these model hyperparameters are fine-tuned or optimised in accord with the data input to optimally control the model’s learning behaviours. However, under the scope of this project, the model hyperparameters will remain unchanged to preserve the comparability of model performances. An early-stopping technique was applied to the model fitting to reduce the risk of overfitting. To ensure the reproducibility of experimental outputs, all the sources of randomness in the training process, such as the initialisation of kernel matrices in the convolutional layers, were controlled with a specific random state so that randomness just really occurs in the stage of data sampling before training the model.
+
+## Sampling strategies to be experimented
+
+In this project, the sample size is fixed and pre-determined to be 100, which means 100 out of 9888 annotation images or roughly 1% of the training data will be selected by sampling to train the model. It is acknowledged that the sample size of 100 is an arbitrary choice to begin this project, but other sample sizes can definitely be experimented in later stages. To maintain the independence of sample units, the sampling techniques to be experimented are all without replacement. They are listed below.
+
+-	*Simple Random Sampling*: Being the simplest form of probability sampling, this technique assigns an equal chance of being selected to every possible subset of n units in the population, where n is the desired sample size [@Lohr_2022], so each combination of 100 from the 9888 annotation images in the training data will have the same probability of being selected for the model’s data input.
+
+-	*Systematic Sampling*: With this sampling technique, an initial unit is randomly chosen, then subsequent instances are selected at equal intervals from the first unit [@Bellhouse_2005]. More precisely, the sampling interval k is calculated as the greatest integer less than or equal to N/n, where N is the population size and n is the sample size, then a random number r between 1 and k is chosen to be the index of the first sample unit, and subsequent instances are selected at every kth unit from the first one. In this case, N is 9888, n is 100, k will be 98, so every 98th instance will be sampled after the 9888 annotation images are arranged by a sorting function.
+
+-	*Sampling with a specific plant/not-plant ratio*: Another popular probability sampling technique is stratified sampling, which separates the population into homogenous, mutually exclusive segments, called strata, then randomly selects instances in each stratum so that the fraction of units taken from each stratum is proportional to its total size in the population [@Iliyasu_Etikan_2021]. In this paper, plant and not-plant can be considered two strata for sampling, but instead of fixing the ratio between them proportionally to their sizes in the entire training data, different ways of distributing positive and negative instances to 100 slots in a training-data sample are observed with various plant/not-plant ratios, denoted as \(\alpha\)P:\(\beta\)NP (i.e. \(\alpha\)% of the sample size for plant annotations and \(\beta\)% for non-plant annotations). The selection of instances in each class is random. Each of the following plant/not-plant ratios is experimented as a separate sampling strategy, including 10P:90NP, 20P:80NP, 30P:70NP, 40P:60NP, 50P:50NP, 60P:40NP, 70P:30NP, 80P:20NP, and 90P:10NP.
+
+## Evaluation metric
+
+Although the neural network model is made to differentiate between plant and not-plant instances, its ultimate goal is to count emerged plants in plot images, so the variable of interest to evaluate is rather continuous. The task initially appeared to fall under the binary-classification scheme, and the model does have an internal classification-based mechanism, but the evaluation should resort to a regression approach to quantify the plant counts. Hence, when many plant-count errors are collected, it is suitable to condense all these residuals into a single score, using the Root Mean Square Error (RMSE). As stated by [@Jierula_et_al_2021], RMSE measures the average magnitude of error between the predicted (model-made) plant count and the actual (manual) plant count, the lower an RMSE score is, the more effectively a model performs. [@Jierula_et_al_2021] also pointed out that RMSE was highly interpretable relative to the variable being studied as they have the same measurement unit. Further, this metric is usually effective in accentuating model performance differences [@Chai_Draxler_2014], so it would be desirable for the assessment of different model results in this paper. The formula to calculate RMSE is \(\sqrt{\frac{1}{n}\sum_{i=1}^{n}({\hat{y}}_i - y_i)^2}\), where n is the number of data points to calculate residuals, \(\hat{y}\)\(_i\) is the predicted value, and y\(_i\) is the actual value. When this formula is applied to evaluating the model performance on the test data, n is equal to 30 as there are 30 test plots, \(\hat{y}\)\(_i\) and y\(_i\) are the model-made count and the true hand count of plants for a plot respectively.
+
+## Simulation design and workflow
+
+```{=tex}
+\begin{figure}[!h]
+\centering
+\includegraphics[width = 12.5cm]{supplementary/visualisations/code_flowchart.png}
+\caption{An over-arching flowchart demonstrating how the code is elaborated to perform each sampling experiment in a simulation}
+\label{fig:code_flowchart}
+\end{figure}
+```
+
+\autoref{fig:code_flowchart} demonstrates how different chunks of code were written, from an over-arching view, to conduct an experiment for one sampling strategy. As an illustration, one simulation run begins with selecting 100 annotation images, divided into plant and not-plant directories, from the 9888 cut-outs in the training data. These 100 annotations are fed into *peatrain_tensorflow.py* to train the neural network model. After the trained model is saved, the 30 test plots are processed for the classification task. For one individual test plot image, it is put through *peascription.py* together with its corresponding red-dotted photo to create two directories containing 64x64 cut-outs of plant and not-plant annotations. Subsequently, the newly trained model generates prediction probabilities for each of those cut-outs, whenever the probability of a cut-out belonging to the positive class is greater than that to the negative class, the model-made count of plants for that particular test plot is incremented by one. Once all of its cut-outs receive predictions, the model-made plant count will be compared against the true value of manual count, which is the length of the plant-annotation directory generated by *peascription.py*, to obtain the prediction error on that plot. After all of the 30 test plots are processed, 30 prediction residuals will be collected and an RMSE score can be computed accordingly. For each sampling method experimented, the whole procedure above will be iterated for a desired number of rounds to obtain multiple RMSE scores, then the average of these RMSE scores, together with their standard deviation, will be obtained to make inferences about the overall prediction error returned by the trained model.
+
+## Determining the number of iterations for each simulation
+
+To delve into the reason for iterating a sampling experiments many times, it is worth mentioning that for each individual sampling strategy, one single RMSE score might be unrepresentative of all possible prediction residuals and insufficient to draw reasonable inferences about the expected plant-count errors the model would generate on the test plots. To take care of the variability caused by the stochasticity of sampling, each sampling experiment will be performed in a simulation, which is synonymous with the idea that they will be run in many rounds or iterations, then the RMSE scores obtained in all iterations will be averaged to deduce the expected plant-count errors. As claimed by [@Puerta_Ciannelli_Johnson_2019], simulation helps to enhance unbiasedness and precision in the estimation of a population parameter (which is the plant-count RMSE on the unseen data or test plots in this case), and cropping industries are among the fields where simulation has been used to compare different sampling strategies.
+
+```{=tex}
+\begin{figure}[h!]
+\centering
+\includegraphics[width = 15cm]{supplementary/visualisations/iterations.png}
+\caption{The cumulative plant-count RMSE averages to determine the number of iterations for each sampling simulation by identifying appropriate points of convergence}
+\label{fig:iterations}
+\end{figure}
+```
+
+According to the Law of Large Numbers, as the number of times a single experiment is conducted rises to infinity, the successive averages calculated from the resulting estimates will eventually converge almost surely to the true population mean [@Dinov_Christou_Gould_2009]. As per this theory, the number of iterations for a sampling simulation needs to be large enough for the cumulative averages of plant-count RMSE scores to display a visible convergence towards a specific value. However, due to the time constraint and a limited computing power during this project, that number cannot be set too high as running a sampling experiment too many times, such as 1000 rounds or more, is not a viable option. Thus, as presented below, an appropriate simulation length is determined for each sampling strategy by incrementally repeating the experiment and visually identifying an appropriate point of convergence in the subsequent cumulative RMSE averages.
+
+As shown in \autoref{fig:iterations}, the Simple Random Sampling method was simulated with 250 rounds, and its cumulative RMSE averages on the test plots could be seen to start stabilising from the 170\(^{th}\) iteration, despite some minor fluctuations still remaining, so 250 would be an appropriate number of iterations for this simulation. Similarly, as another example, the cumulative RMSE averages returned by the Systematic Sampling method start converging from the 310\(^{th}\) round, so any number passing 310 would be an adequate simulation length, in this case it is chosen to be 450. Appling the same principle to the other sampling strategies, it is decided that 120 iterations will be run for the 10P:90NP sampling simulation, 400 iterations for the 20P:80NP, 200 iterations for the 30P:70NP, 130 iterations for the 40P:60NP, 310 iterations for the 50P:50NP, 500 iterations for the 60P:40NP, 300 iterations for the 70P:30NP, 480 iterations for the 80P:20NP, and 390 iterations for the 90P:10NP.
+
+## Computing confidence intervals for the plant-count RMSE and using statistical tests to compare the expected residuals returned by each sampling protocol
+
+As suggested by [@Hazra_2017], once sample statistics such as the average and standard deviation of plant-count RMSE scores are obtained from the simulation, confidence intervals are calculated to estimate the range that, to some extent of certainty, contains population parameter, which is the average RMSE that a sampling strategy would cause the model to produce on the test data. [@Hazra_2017] also specified that if the number of samples drawn is sufficiently large or specifically greater than 100, the confidence intervals can be calculated based on the critical z-score. Because all sampling simulations in this paper are run with more than a hundred iterations, confidence intervals of the plant-count RMSE scores are calculated with the following formula: 
+
+$$ Confidence interval=\ Sample\ mean\ \pm\ Critical\ z\text{-}value\times\ \frac{Sample\ standard\ deviation}{\sqrt{the\ number\ of\ samples}} $$
+
+Finally, the RMSE scores in simulation results are put in comparison, and the initial idea was to perform pairwise comparisons among the 10 sampling strategies experimented with a t-test. However, repeating a t-test for every pair of sampling strategies would exponentially add up the chances of Type I error, causing the error rate to climb unacceptably and to be no longer comparable to a significance level chosen beforehand [@Kim_2014]. In simpler terms, that would increase the propensity for erroneously rejecting the null hypothesis when it actually holds true or favouring the alternative hypothesis when it has no statistical significance [@Kim_2017]. To avoid that pitfall, the method of one-way analysis of variance (ANOVA) is recommended to accommodate the mean comparison of more than two sampling protocols in this case. Nevertheless, a classical ANOVA F-test relies on strict assumptions that the residuals follow a normal distribution and have homogeneity of variance within each sample group, both assumptions may even have more severe impacts when the groups are different in their sizes [@Delacre_et_al_2019]. To graphically check the validity of these two assumptions, [@Bewick_Cheek_Ball_2004_9] described the use of residual plots produced from the ANOVA results, a Q-Q plot with residual points falling approximately straight on the diagonal line would suggest normality in the residuals, and a residuals-versus-fits plot would be indicative of equal variances if residual values are evenly scattered around zero. Also, a Shapiro-Wilk test is performed to statistically check the assumption of normality [@Ghasemi_Zahediasl_2012], and a Levene's test is performed to statistically check the assumption of homoscedasticity [@Carroll_Schneider_1985] (The background details behind these two statistical tests are not covered in this paper). Applying those visual and statistical tests after an ANOVA model is fitted on the RMSE scores from the sampling simulation outputs and the residuals are scrutinised, it is recognised that those assumptions of normality and equal variances are unfortunately not satisfied, which will be elucidated in the Results section.
+
+Because of those assumption violations, the Kruskal-Wallis H-test is conducted as an alternative solution for the ANOVA method. It is a non-parametric test deciding whether or not to reject the null hypothesis of all mean ranks or medians of the sample groups being equal (i.e. the alternative hypothesis is that at least two of their medians are different) [@Bewick_Cheek_Ball_2004_10]. Before being compared against a chosen significance level of 0.05 to assess statistical significance, a p-value can be obtained from the Kruskal-Wallis H-test with the test statistic H being calculated as follow:
+
+$$ H = \left[ \frac{12}{N(N+1)} \sum_{i=1}^{c} \frac{R_i^2}{n_i} \right] - 3(N+1) \quad\text{,}\quad $$
+
+where \(c\) is the number of sample groups, \(n_i\) is the number of observations in the \(i^{th}\) is sample group, \(N\) is the total number of all observations estimated, and \(R_i\) is the sum of ranks in the \(i^{th}\) sample group [@Kruskal_Wallis_1952]. After that, if the RMSE estimates across the 11 sampling protocols are shown to differ overall by the Kruskal-Wallis test, a follow-up test or a post-hoc test will be performed to examine which pairs of sample groups or which pairs of the sampling strategies experimented truly experience a difference in their plant-count RMSE estimates [@Chan_Walmsley_1997]. The Dunn’s test is an appropriate post-hoc analysis method to be chosen [@Dinno_2015], and the Holm correction method is opted for the adjustment of error rate to address the Type I error inflation in multiple pairwise comparisons [@Holm_1979], then the adjusted p-values can be collated with the planned significance level of 0.05. For ease of calculation, all statistical tests are run in the specialised statistical software tool R.
+
+# Results
+
+## A basic summary and 95% confidence intervals of the plant-count RMSE
+
+\begin{table}[!ht]
+    \centering
+    \caption{The mean \& standard deviation (abbreviated as Std.) of RMSE scores returned by each sampling protocol (ordered by mean RMSE) and their simulation length}
+    \begin{tabular}{|r|r|r|r|}
+    \hline
+        \textbf{Sampling experiment} & \textbf{Mean RMSE} & \textbf{Std RMSE} & \textbf{Simulation length} \\ \hline
+        70P:30NP Sampling & 14.58243159 & 9.832760977 & 300 \\ \hline
+        80P:20NP Sampling & 14.67584197 & 10.53338511 & 480 \\ \hline
+        60P:40NP Sampling & 21.05187023 & 14.07148796 & 500 \\ \hline
+        50P:50NP Sampling & 23.42289885 & 14.20432508 & 310 \\ \hline
+        90P:10NP Sampling & 25.38079039 & 7.195019394 & 390 \\ \hline
+        40P:60NP Sampling & 32.24173531 & 17.64324882 & 130 \\ \hline
+        Systematic Sampling & 37.56645147 & 20.7108586 & 450 \\ \hline
+        Simple Random Sampling & 41.07619515 & 32.73699184 & 250 \\ \hline
+        30P:70NP Sampling & 42.52204079 & 28.13139272 & 200 \\ \hline
+        20P:80NP Sampling & 101.7260557 & 41.3695946 & 400 \\ \hline
+        10P:90NP Sampling & 144.2858274 & 2.00E-13 & 120 \\ \hline
+    \end{tabular}
+    \label{rmse_summary}
+\end{table}
+
+```{=tex}
+\begin{figure}[h!]
+\centering
+\includegraphics[width = \linewidth]{supplementary/visualisations/box-plots.png}
+\caption{Side-by-side box plots comparing the distribution of the plant-count RMSE scores on test plots for each sampling strategy experimented}
+\label{fig:boxplots}
+\end{figure}
+```
+
+With RMSE as the metric chosen, the neural network model trained on different data selected by each sampling strategy was evaluated on the 30 test plots. The average plant-count RMSE scores of the 11 sampling simulations, together with the standard deviations and the simulation length, are recorded in \autoref{rmse_summary}, and side-by-side box plots are also produced in \autoref{fig:boxplots} for visual examination. To highlight, the 70P:30NP sampling method appears to train the most effective model with the lowest average RMSE score of 14.582 on the test data. With nearly the same mean RMSE, the 80P:20NP sampling method comes seconds with a model that on average miscounts 14.676 emerged plants. However, if the proportion of plant annotations in the training sample goes up further to 90%, the resulted model performance is just at a middle level with a mean RMSE of 25.381, but its standard deviation reaches the lowest at 7.195, which might imply that the trained model was performing more consistently on the test plots and it was asking for more data of the negative class to make more accurate classifications. 
+
+As contrasted to the methods favouring more plant annotations over not-plant ones, training data selected by the 10P:90NP sampling strategy returns the worst model performance or the highest average RMSE value of 144.286. More noticeably, the standard deviation of this sampling experiment is zero, meaning that its average RMSE score is constant across all simulation runs. Looking more closely, it is found that the model trained from this sampling method returns a plant count of zero in all 30 test plots, or it fails to detect any emerged plants. Following that is the 20P:80NP sampling strategy with a mean RMSE of 101.726, this score is drastically higher than those of third-worst and the fourth-worst sampling strategies, which are the 30P:70NP and the systematic sampling protocols with the mean RMSE estimate of 42.522 and 41.076 respectively. So, beside the 10P:90NP method, the mean RMSE returned by the 20P:80NP method is suggestive of an almost complete lack of predictive power in the trained model, even when taking into account the variability of that performance score. Overall, as the segment of not-plant annotations in the training data sample goes up from 10% to 90%, the trained model tends to produce greater plant-count errors. Conversely, the mean RMSE scores decline as the percentage of plant annotations in the sample increases from 10% to 70%, then go back up when that proportion reaches higher to 80% and 90%. 
+
+```{=tex}
+\begin{figure}[h!]
+\centering
+\includegraphics[width = 12cm]{supplementary/visualisations/ci.png}
+\caption{95\% confidence intervals calculated for the mean RMSE of plant counts returned by each sampling strategy (The 10P:90NP and 20P:80NP sampling methods are omitted because their RMSE values are so large that the graph readability would be undermined)}
+\label{fig:ci}
+\end{figure}
+```
+
+Accompanying the means and standard deviations, a 95% confidence interval is calculated for each of those RMSE estimates to analyse how reliable they are. \autoref{fig:ci} presents how the confidence intervals of each sampling strategy can be visually compared against each other. It is graphically probable that the 80P:20NP and 70P:30NP sampling methods may yield equally impressive model performances, and they still evidently stand out as there is no overlap between their 95% confidence intervals and those of the other sampling strategies. There is a fair chance that the 60P:40NP and 50P:50NP methods may return similar RMSE scores at some points. At the bottom of the pile, apart from the worst two methods of 20P:80NP and 10P:90NP sampling, the models trained with the 30P:70NP and systematic sampling techniques also have a high chance of performing equivalently.
+
+## The one-way ANOVA test is not feasible due to assumption violations
+
+```{=tex}
+\begin{figure}[h!]
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{supplementary/visualisations/qq_plot.png}
+  \caption{Q-Q plot}
+  \label{fig:qq_plot}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{supplementary/visualisations/residuals_vs_fits.png}
+  \caption{Residual-versus-fits plot}
+  \label{fig:r_vs_f_plot}
+\end{subfigure}
+\label{fig:anova_assump_check}
+\caption{A Q-Q plot to check the normality of the ANOVA model's residuals and a residuals-versus-fits plot to check the assumption of homogeneous variances}
+\end{figure}
+```
+\
+
+\begin{table}[!h]
+    \caption{\label{anova_test} The Shapiro-Wilk test and the Levene's Test to statistically check the assumptions of normality and homoscedasticity respectively for the fitted ANOVA model}
+    \begin{subtable}{.5\linewidth}
+      \centering
+        \caption{\label{shapiro} The Shapiro-Wilk test}
+        \begin{tabular}{|r|r|}
+            \hline
+                \multicolumn{2}{|c|}{\textbf{Shapiro-Wilk normality test}}\\ \hline
+                Data & anova\$residuals \\ \hline
+                Test statistic W & 0.91949 \\ \hline
+                P-value & < 2.2e-16 \\ \hline
+        \end{tabular}
+    \end{subtable}%
+    \begin{subtable}{.5\linewidth}
+      \centering
+        \caption{\label{levene} The Levene's Test}
+        \begin{tabular}{|r|r|}
+          \hline
+              \multicolumn{2}{|c|}{\textbf{Levene's Test for Homoscedasticity}}\\ \hline
+              Degrees of freedom & df1 = 10, df2 = 3519 \\ \hline
+              Test statistic W & 190.61 \\ \hline
+              P-value & < 2.2e-16 \\ \hline
+        \end{tabular}
+    \end{subtable} 
+\end{table}
+
+The initial attempt to determine the overall difference in the RMSE scores returned by the sampling strategies is to use a one-way ANOVA test. However, after an ANOVA model is fitted, the Q-Q plot produced for its residuals suggest a violation of the normality assumption because the residual points deviate markedly from the reference diagonal line, as shown in \autoref{fig:qq_plot}. Moreover, a violation of the homoscedasticity assumption can also be seen from the residuals-versus-fits plot in \autoref{fig:r_vs_f_plot} as the residuals are not spread equally around zero at the fitted values. These two assumption violations of the ANOVA method are also statistically proven with a Shapiro-Wilk test and a Levene's test summarised in \autoref{shapiro} and \autoref{levene} respectively, the two p-values of nearly zero in both tests suggest to reject the null hypothesis of normality in the ANOVA residuals and to reject the null hypothesis of homogeneous variances across the sample groups.
+
+## The results of the Kruskal-Wallis H-test and the post-hoc Dunn's test
+
+\begin{table}[h!]
+    \centering
+    \caption{A summry of the Kruskal-Wallis test on RMSE scores against sampling methods}
+    \begin{tabular}{|r|r|}
+    \hline
+        \multicolumn{2}{|c|}{\textbf{Kruskal-Wallis rank sum test}}\\ \hline
+        Formula & RMSE\_score \(\sim \) Sampling\_strategy \\ \hline
+        Degrees of freedom & 10 \\ \hline
+        Test statistic H & 1800.3 \\ \hline
+        P-value & < 2.2e-16 \\ \hline
+    \end{tabular}
+    \label{kruskal_wallis}
+\end{table}
+
+As an alternative to the ANOVA method, the Kruskal-Wallis H-test is performed to statistically assess the overall difference in the RMSE estimates returned by the 11 sampling strategies experimented. As in \autoref{kruskal_wallis}, the p-value computed for the Kruskal-Wallis H-test is much smaller than the chosen significance level of 0.05, so there is enough evidence to reject the null hypothesis that the parameter estimates of all sample groups are the same, or to conclude that at least two sampling strategies would experience a statistically significant difference in their RMSE estimates. 
+
+```{=tex}
+\begin{figure}[h!]
+\centering
+\includegraphics[width = \linewidth]{supplementary/visualisations/pairwise_p_values}
+\caption{A matrix of adjusted p-values computed from the Dunn's test (with the Holm correction method) for each pair of sampling protocols (the pairwise tests that do not have statistical significance are marked with an asterisk)}
+\label{fig:dunn_test}
+\end{figure}
+```
+
+From that inference, to determine the actual source of difference, the next step is to conduct a Dunn’s test with the Holm correction method for the post-hoc analysis. 55 possible combinations of two from 11 sampling protocols are corresponding to 55 pairwise comparisons of their plant-count RMSE estimates. \autoref{fig:dunn_test} above illustrates the adjusted p-values computed from the Dunn’s test for every pair of sampling strategies. When a p-value returned by the Dunn’s test is lower than the chosen significance value of 0.05, there is enough evidence to reject the null hypothesis of equality between the RMSE estimates of two sampling strategies being compared correspondingly. Out of the 55 pairwise tests, 9 of them are not statistically significant. As expected, with a very high p-value, the 70P:30NP and 80P:20NP sampling strategies are confirmed to produce equal plant-count RMSE estimates. In a similar sense, the RMSE scores returned by the 60P:40NP and 50P:50NP sampling strategies do not show a statistically significant difference, with a p-value of 0.281. Additionally, there is no sufficient evidence to assert a difference in the RMSE estimates for the four methods of Simple Random Sampling, Systematic Sampling, 30P:70NP sampling and 40P:60NP sampling. For the other pairwise comparisons, the statistical differences in the RMSE scores are undeniable. 
+
+# Discussions and limitations
+
+Targeted to the application of a deep learning method to detecting seedling emergence and counting emerged plants on plot images, this study has examined how different ways of sampling 100 units from a total of 9888 annotations of plant and not-plant instances in the training data might cause a neural network model to perform differently on unseen data, using RMSE as the evaluation metric for the prediction errors of emerged plant counts. Each sampling experiment was simulated iteratively to obtain many RMSE scores, which were then averaged to make a more robust estimate of the true plant-count residual. Based on the experimental results, the supposition that different training data samples would lead to significantly different model performance scores on the test plots was thoroughly assessed with both a graphical judgement using side-by-side boxplots and 95% confidence intervals as well as a statistical evaluation using the Kruskal-Wallis H-test. As inferred from the post-hoc Dunn’s test, that supposition held true for 83.6% of all pairwise comparisons (46 out of 55) among the sampling methods experimented.
+
+From a closer look, the results also indicated that a balanced ratio between two labels of the target variable in the training data would not necessarily yield the best-performing prediction model. This inference is in alignment with the aforementioned finding made by [@Joloudari_et_al_2023]. In this classification task, emerged plants are the main object to detect, so the model would understandably require more instances of the positive class (i.e. the plant annotations) to tell them apart from all other miscellaneous materials on the field. Therefore, sampling with a plant/not-plant ratio between 70P:30NP and 80P:20NP is considered the most optimal method to select a subset of the training data to feed a plant-emergence-detection model in this project. Provided only a small portion of the training data can be fed into the model, it is suggested that agricultural technicians and farm-image-processing model developers may employ an imbalanced training data that substantially favours plant instances, or the positive class in other analogous classification tasks within this industry. Nonetheless, there exists a boundary whereby the model would deteriorate if the training-data sample keeps being fed with positive instances and only few negative instances. That issue was typified by a worse model performance when plant annotations predominantly outnumbered not-plant instances in a 90P:10NP sample for the model-training input.
+
+On the other hand, data sampling strategies favouring the negative label were revealed to train ineffective models with low performance scores. It is observed that the higher the proportion of not-plant instances in the sample is, the less predictive the resulting model becomes. Surprisingly, this finding is in contradiction with the research conducted by [@Quan_et_al_2023], who found that sampling strategies that substantially increased the segment of negative instances in the training data returned the best performance for a random forest model classifying burned and unburned land areas. Thus, this research topic would require further investigations to justify its true applicability in diverse contexts. 
+
+There are some potential limitations of this paper that might need to be addressed for improvements in future work. Firstly, the sample size is fixed to be 100 for all experiments throughout this project, while machine learning models are capable of naturally learning new patterns for every new data point inputted, so sampling strategies with a different sample size may remarkably alter the experimental outputs. Secondly, each deep learning architecture can have a multitude of variations, but the deep learning model given in the toolset was already set up and ready to use directly, which may diminish the generalisability of experimental results to new tasks or problems. Finally, because there are three sets of plot images available, corresponding to three days of drone-flying photography on crop fields, with different characteristics of emerged faba bean plants, the outcomes of this paper for Day 3 could be expanded and integrated with the analyses of the other two days for more comprehensive inferences.
+
+# Conclusion
+
+As a novel solution for accelerating the training of neural network models in image processing, particularly in the area of exploiting aerial farm photos for agronomic activities, sampling techniques are expected to help reduce the training data without considerably compromising the model performance. In this work, multiple sampling protocols have been experimented to select a subset of training data to feed into a deep learning model for identifying and counting early seedling emergence of faba beans in plot images. The initial goal of this paper has been accomplished, with a conclusion that different selections of training data generated by different sampling protocols, under a fixed sample size, would cause the model to return significantly different performances to a great extent, with some exceptions of just few closely related sampling methods. The optimal model performance is attained when a training data sample is moderately inclined towards the positive instances or the annotations denoting plant labels. In spite of some potential drawbacks, the results achieved in this paper might bring some practical benefits to preliminary agriculture activities oriented by modern machine learning technologies.
+
+# Acknowledgements {-}
+
+By completing this report, I wish to show my great appreciation to my supervisors, Olena, Peter, and Russell for being absolutely patient to explain every aspect of the project to me, to clarify all of my inquiries along the way, and to provide me with supportive guidance as well as the motivation behind my research direction. 
+
+\newpage
+# Appendices {-}
+
+## Appendix A - Supplementary data and the code script {-}
+
+All the data used for the experiments in this paper are proprietary to the Biometry Hub at the University of Adelaide. Any requests for that data should be submitted to the Biometry Hub.
+
+For the purpose of validating the results in this paper, the script of code is made available and could be found on this Github repository: https://github.com/minhnguyen0612/MDS-A.git
+
+\newpage
+# References {-}
